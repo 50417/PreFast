@@ -1,8 +1,8 @@
 # PreFast 
 
 A simple technique to speed up the neural net training by progressively freezing from both forward and backward pass. The technique is extension of FreezeOut[1].
-![FreezeOut](https://i.imgur.com/yUsVdIs.png)
-![PreFast](https://i.imgur.com/ihglNNe.png)
+![FreezeOut](https://i.imgur.com/FhdOjZT.png 'Freezeout Technique')
+![PreFast](https://i.imgur.com/ihglNNe.png 'PreFast Technique')
 
 This repository contains code for PreFast.
 
