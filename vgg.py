@@ -7,7 +7,9 @@ import torch.nn.functional as F
 import math
 import numpy as np
 
+# from utils import scale_fn, get_train_batch_ratio
 from utils import scale_fn
+
 import torch.utils.data as data_utils
 from torch.utils.data import DataLoader
 class MaxPool(nn.Module):
@@ -71,6 +73,17 @@ class Layer(nn.Module):
                     DenseNet.concat_output_tensor= out
                     DenseNet.concat_output_label = DenseNet.label
                 else:
+
+                    # print("In Forward ...............")
+                    # print("DenseNet.concat_output_tensor.type() ::", DenseNet.concat_output_tensor.type())
+                    # print("DenseNet.concat_output_label.type() ::", DenseNet.concat_output_label.type())
+                    # print("out.type() ::", out.type())
+
+                    # print("DenseNet.label.type()   ::", DenseNet.label.type())
+
+
+
+
                     DenseNet.concat_output_tensor = torch.cat((DenseNet.concat_output_tensor,out),0)
                     DenseNet.concat_output_label = torch.cat((DenseNet.concat_output_label, DenseNet.label),0)
             return out
@@ -92,8 +105,13 @@ class DenseNet(nn.Module):
     freezeLayerIndex = -1
     test = False
     counter_layer = {}
-    concat_output_tensor = torch.FloatTensor()
-    concat_output_label = torch.FloatTensor()
+#    concat_output_tensor = torch.FloatTensor()
+#    concat_output_label = torch.FloatTensor()
+    concat_output_tensor = torch.cuda.FloatTensor()
+    concat_output_label = torch.LongTensor()
+
+
+
     def __init__(self,growthRate, depth, nClasses, epochs, t_0, scale_lr=True, how_scale = 'cubic',const_time=False, cfg=cfg['E'],batch_norm=True):
         super(DenseNet, self).__init__()
         
@@ -102,6 +120,9 @@ class DenseNet(nn.Module):
         self.scale_lr = scale_lr
         self.how_scale = how_scale
         self.const_time = const_time
+
+        #Store the dataset class MNIST or CIFAR to be used in make_layer function
+        self.nClasses = nClasses
         
         self.layer_index = 0
         self.features = self.make_layers(cfg,batch_norm)
@@ -161,6 +182,8 @@ class DenseNet(nn.Module):
                 #self.itr_epoch = train_sz//batch_sz
                 
                 #Changed as 1000 was a hardcoded number for Iteration wise freezing while we are doing epoch wise freezing
+#Added
+                # m.max_j = self.epochs * get_train_batch_ratio() * m.lr_ratio				
                 m.max_j = self.epochs  * m.lr_ratio
                 
                 # Optionally scale the learning rates to have the same total
@@ -170,7 +193,12 @@ class DenseNet(nn.Module):
 
     def make_layers(self, cfg, batch_norm=False):
         layers = []
-        in_channels = 3
+
+        if (self.nClasses == 50):
+            in_channels = 1
+        else:
+            in_channels = 3
+#        in_channels = 3
         for v in cfg:
             if v == 'M':
                 layers += [MaxPool( in_channels,v,self.layer_index)]
@@ -224,6 +252,8 @@ class DenseNet(nn.Module):
             train_loader = DataLoader(train_set, batch_size=batch_size,
                               shuffle=True)
             #Reinitializing the used Tensor Memory
-            DenseNet.concat_output_tensor = torch.FloatTensor()
+#            DenseNet.concat_output_tensor = torch.FloatTensor()
+            DenseNet.concat_output_tensor = torch.cuda.FloatTensor()
+
             return train_loader
 

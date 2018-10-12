@@ -157,7 +157,11 @@ class DenseNet(nn.Module):
     freezeLayerIndex = -1
     test = False
     concat_output_tensor = torch.cuda.FloatTensor()
-    concat_output_label = torch.cuda.FloatTensor()
+    # concat_output_label = torch.cuda.FloatTensor()
+	
+    concat_output_label = torch.cuda.LongTensor()	
+	
+	
     def __init__(self, growthRate, depth, nClasses, epochs, t_0, scale_lr=True, how_scale = 'cubic',const_time=False,reduction=0.5, bottleneck=True):
         super(DenseNet, self).__init__()
         
@@ -184,8 +188,20 @@ class DenseNet(nn.Module):
         nChannels = 2*growthRate
         #Dummy variable to keep track of freezing of First Convolution Layer
         self.first_layer = 0
-        self.conv1 = nn.Conv2d(3, nChannels, kernel_size=3, padding=1,
-                               bias=False)
+		
+		
+#if Dataset MNIST 		
+        if (nClasses == 50):
+            self.conv1 = nn.Conv2d(1, nChannels, kernel_size=3, padding=1, bias=False)        
+        else:
+            self.conv1 = nn.Conv2d(3, nChannels, kernel_size=3, padding=1, bias=False)
+                               
+#        self.conv1 = nn.Conv2d(1, nChannels, kernel_size=3, padding=1,
+#                               bias=False)
+
+#Store the dataset class to be used in the forward function.
+        self.nClasses = nClasses
+							   
         self.conv1.layer_index = 0
         self.conv1.active=True
         self.layer_index = 1
@@ -324,6 +340,13 @@ class DenseNet(nn.Module):
         out = self.trans1(self.dense1(out))
         out = self.trans2(self.dense2(out))
         out = self.dense3(out)
-        out = torch.squeeze(F.avg_pool2d(F.relu(self.bn1(out)), 8))
+#        out = torch.squeeze(F.avg_pool2d(F.relu(self.bn1(out)), 8))
+
+#If MNIST dataset		
+        if (self.nClasses == 50):
+            out = torch.squeeze(F.avg_pool2d(F.relu(self.bn1(out)), 7))
+        else:
+            out = torch.squeeze(F.avg_pool2d(F.relu(self.bn1(out)), 8))	
+			
         out = F.log_softmax(self.fc(out))
         return out

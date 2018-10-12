@@ -18,6 +18,19 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 import random
 
+
+#added
+# batch_sz = 0
+# train_sz = 0
+
+# def get_train_batch_ratio():
+
+    # # print("get_train_batch_ratio train_sz :", train_sz)
+    # # print("get_train_batch_ratio batch_sz :", batch_sz)
+    # return train_sz/batch_sz 
+
+
+	
 random.seed(0)
 scale_fn = {'linear':lambda x: x,
                          'squared': lambda x: x**2,
@@ -53,7 +66,7 @@ def calc_speedup(growthRate,nDenseBlocks,t_0,how_scale):
         return 1-float(C_f)/C
 
 
-def get_data_loader(which_dataset,augment=True,validate=True,batch_size=50):
+def get_data_loader(which_dataset,augment=True,validate=True,batch_size=50, model='densenet'):
     class CIFAR10(dset.CIFAR10):
         def __len__(self):
             if self.train:
@@ -69,6 +82,15 @@ def get_data_loader(which_dataset,augment=True,validate=True,batch_size=50):
             else:
                 return 10000
 
+    class MNIST(dset.MNIST):
+        def __len__(self):
+            if self.train:
+                return len(self.train_data)
+            else:
+                return 10000
+
+    kwargs = {'num_workers': 1, 'pin_memory': False}
+	
     if which_dataset is 10:
         print('Loading CIFAR-10...')
         norm_mean = [0.49139968, 0.48215827, 0.44653124]
@@ -81,49 +103,168 @@ def get_data_loader(which_dataset,augment=True,validate=True,batch_size=50):
         norm_std = [0.26733428, 0.25643846, 0.27615049]
         dataset = CIFAR100
 
+    elif which_dataset is 50:
+        print('Loading MNIST...')
+#        norm_mean = (0.1307,)
+#        norm_std =  (0.3081,)
+
+        norm_mean = [0.1307]
+        norm_std = [0.3081]
+
+        dataset = MNIST
+
+		# Prepare transforms and data augmentation
+        norm_transform = transforms.Normalize(norm_mean, norm_std)		
+		
+        if(model == 'vgg'):	
+            print("Model vgg Data MNIST")		
+
+            train_transform = transforms.Compose([
+                transforms.Resize((32, 32)),		
+                transforms.RandomCrop(32, padding=4),
+                # transforms.RandomCrop(28, padding=4),
+
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                norm_transform
+            ])
+
+            test_transform = transforms.Compose([
+                transforms.Scale((32, 32)),	
+                transforms.ToTensor(),
+                norm_transform
+            ])
+
+        else:
+            print("Model Not vgg Data MNIST")				
+            train_transform = transforms.Compose([	
+#                transforms.RandomCrop(32, padding=4),
+                transforms.RandomCrop(28, padding=4),
+
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                norm_transform
+            ])
+
+            test_transform = transforms.Compose([
+                transforms.ToTensor(),
+                norm_transform
+            ])				
+
+        train_set = dataset(
+            root='mnist',
+            train=True,
+            download=True,
+            transform=train_transform if augment else test_transform)
+
+        if validate == 'test':
+            test_set = dataset(root='mnist', train=False, download=True,
+                           transform=test_transform)
+
+
+    # If we're evaluating on the validation set, prepare validation set
+    # as the last portion of test datat.
+        elif validate:
+            test_set = dataset(root='mnist', train=False, download=True,
+                           transform=test_transform)
+
+
+        test_set.train_data = test_set.test_data
+        test_set.train_labels = test_set.test_labels
+
+        train_set.train_data = train_set.train_data[56000:60000]
+        train_set.train_labels = train_set.train_labels[56000:60000]
+
+        # Prepare data loaders
+        train_loader = DataLoader(train_set, batch_size=batch_size,
+                              shuffle=True, **kwargs)
+        test_loader = DataLoader(test_set, batch_size=batch_size,
+                             shuffle=False, **kwargs)
+        print("train_set size = ", len(train_set.train_data))
+        print("test_set size = ", len(test_set.train_data))
+
+        #Set the train_sz and batch_sz to be used in densenet
+        global train_sz
+        train_sz = len(train_set.train_labels)
+	
+        global batch_sz	
+        batch_sz = batch_size
+	
+        # print("Utils train_sz :", train_sz)
+        # print("Utils batch_sz :", batch_sz)
+        return train_loader, test_loader
+		
+
     # Prepare transforms and data augmentation
     norm_transform = transforms.Normalize(norm_mean, norm_std)
+	
     train_transform = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
+#        transforms.RandomCrop(28, padding=4),
+
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         norm_transform
     ])
+	
     test_transform = transforms.Compose([
         transforms.ToTensor(),
         norm_transform
     ])
-    kwargs = {'num_workers': 1, 'pin_memory': True}
-
-    train_set = dataset(
-        root='cifar',
-        train=True,
-        download=True,
-        transform=train_transform if augment else test_transform)
+	
+    # kwargs = {'num_workers': 1, 'pin_memory': False}
+	
+    if (which_dataset==50):
+        train_set = dataset(
+            root='mnist',
+            train=True,
+            download=True,
+            transform=train_transform if augment else test_transform)
+    else:
+        train_set = dataset(
+            root='cifar',
+            train=True,
+            download=True,
+            transform=train_transform if augment else test_transform)
     # If we're evaluating on the test set, load the test set
     if validate == 'test':
-        test_set = dataset(root='cifar', train=False, download=True,
+        if which_dataset==50:
+            test_set = dataset(root='mnist', train=False, download=True,
                            transform=test_transform)
+        else:
+            test_set = dataset(root='cifar', train=False, download=True,
+                           transform=test_transform)
+
 
     # If we're evaluating on the validation set, prepare validation set
     # as the last portion of test datat.
     elif validate:
-        test_set = dataset(root='cifar', train=False, download=True,
+        if which_dataset== 50:
+            test_set = dataset(root='mnist', train=False, download=True,
                            transform=test_transform)
-        test_set.train_data = test_set.test_data[-2500:]
-        test_set.train_labels = test_set.test_labels[-2500:]
-        train_set.train_data = train_set.train_data[:-47500]
-        train_set.train_labels = train_set.train_labels[:-47500]
+        else:
+            test_set = dataset(root='cifar', train=False, download=True,
+                           transform=test_transform)
+
+#        test_set.train_data = test_set.test_data[-4000:-2000]
+#        test_set.train_labels = test_set.test_labels[-4000:-2000]
+
+        test_set.train_data = test_set.test_data
+        test_set.train_labels = test_set.test_labels
+
+
+        train_set.train_data = train_set.train_data[0:2000]
+        train_set.train_labels = train_set.train_labels[0:2000]
 
     # Prepare data loaders
     train_loader = DataLoader(train_set, batch_size=batch_size,
                               shuffle=True, **kwargs)
     test_loader = DataLoader(test_set, batch_size=batch_size,
                              shuffle=False, **kwargs)
-
-    print("test_set size = ", len(test_set.train_data))
     print("train_set size = ", len(train_set.train_data))
-    return train_loader, test_loader, len(train_set.train_data), len(test_set.train_data)
+    print("test_set size = ", len(test_set.train_data))
+#    return train_loader, test_loader, len(train_set.train_data), len(test_set.train_data)
+    return train_loader, test_loader
     
 
 class MetricsLogger(object):

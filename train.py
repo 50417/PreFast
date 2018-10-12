@@ -158,9 +158,13 @@ def train_test(depth, growth_rate, dropout, augment,
     model_module = __import__(model)
 
     # Get information specific to each dataset
-    train_loader,test_loader, train_size, test_size = get_data_loader(which_dataset, augment,
-                                               validate, batch_size)
+    # train_loader,test_loader, train_size, test_size = get_data_loader(which_dataset, augment,
+                                               # validate, batch_size)
 
+    train_loader,test_loader = get_data_loader(which_dataset, augment,
+                                               validate, batch_size, model)
+											   
+											   
     # Build network, either by initializing it or loading a pre-trained
     # network.
     if resume:
@@ -215,6 +219,10 @@ def train_test(depth, growth_rate, dropout, augment,
     max_gpu_memory = 0
     # Finally, launch the training loop.
     logging.info('Starting training at epoch '+str(start_epoch)+'...')
+
+# Record Training start time	
+    train_start_time = time.time()		
+	
     for epoch in range(start_epoch, net.epochs):
 
         # Pin the current epoch on the network.
@@ -239,7 +247,11 @@ def train_test(depth, growth_rate, dropout, augment,
         batches = progress(
             train_loader, desc='Epoch %d/%d, Batch ' % (epoch + 1, net.epochs),
             total=len(train_loader.dataset) // batch_size)
-
+			
+#        print("======================================================")
+#        print("batches = ", batches.type())
+#        print("======================================================")		
+		
         # Put the network into training mode
         net.train()
     
@@ -291,17 +303,33 @@ def train_test(depth, growth_rate, dropout, augment,
             print('  validation error:\t%.2f%%' % val_err)
             mlog.log(epoch=epoch, val_loss=val_loss, val_err=val_err)
 
+        # # Save weights for this epoch
+        # print('saving weights to ' + save_weights + '...')
+        # torch.save(net, save_weights + '.pth')
+# Record Train End Time	
+    train_end_time = time.time()		
+    print("Training Time", train_end_time - train_start_time)
+
+# Start Validation Timer	
+#    val_start_time = time.time()
+	
+
+
+# End Validation Timer	
+#    val_end_time = time.time()
+#    print("Total Validation Time", val_end_time - val_start_time)
+	
         # Save weights for this epoch
-        print('saving weights to ' + save_weights + '...')
-        torch.save(net, save_weights + '.pth')
+#        print('saving weights to ' + save_weights + '...')
+#        torch.save(net, save_weights + '.pth')
         
     # At the end of it all, save weights even if we didn't checkpoint.
     if save_weights:
         print("Max GPU Memory",max_gpu_memory)
-        torch.save(net, save_weights + '.pth')
-    with open(model+".csv", "a") as myfile:
-        myfile.write(str(t_0)+","+str(round(train_loss,2))+","+str(round(val_loss,2))+","+str(round(val_err,2))+","+str(max_gpu_memory))
-    return model
+        # torch.save(net, save_weights + '.pth')
+    # with open(model+".csv", "a") as myfile:
+        # myfile.write(str(t_0)+","+str(round(train_loss,2))+","+str(round(val_loss,2))+","+str(round(val_err,2))+","+str(max_gpu_memory))
+    # return model
 
 
 def main():
@@ -310,11 +338,12 @@ def main():
     args = parser.parse_args()
 
     train_start_time = time.time()
-    model = train_test(**vars(args))
+    # model = train_test(**vars(args))
+    train_test(**vars(args))	
     train_end_time = time.time()
     total_time= train_end_time - train_start_time
-    with open(model+".csv", "a") as myfile:
-        myfile.write(","+str(round(total_time)) + "\n")
+    # with open(model+".csv", "a") as myfile:
+        # myfile.write(","+str(round(total_time)) + "\n")
 
     print("Total Training Time", train_end_time - train_start_time)
 
